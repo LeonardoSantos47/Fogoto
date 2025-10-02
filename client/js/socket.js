@@ -33,10 +33,10 @@ class SocketManager {
             this.currentServerUrl = savedUrl;
         } else {
             // URLs padrão baseadas no ambiente
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                this.currentServerUrl = 'https://kelly-currency-surrey-makeup.trycloudflare.com';
-            } else {
-                this.currentServerUrl = 'https://kelly-currency-surrey-makeup.trycloudflare.com';
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    this.currentServerUrl = 'https://sea-austin-technological-fold.trycloudflare.com';
+                } else {
+                    this.currentServerUrl = 'https://sea-austin-technological-fold.trycloudflare.com';
             }
         }
         
