@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crash Rocket Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- Seletor de Servidor -->
+        <div class="server-selector">
+            <div class="server-indicator" id="server-indicator">
+                <div class="server-dot" id="server-dot"></div>
+                <span class="server-text" id="server-text">Servidor</span>
+                <button class="server-btn" id="server-btn">⚙️</button>
+            </div>
+            <div class="server-dropdown hidden" id="server-dropdown">
+                <div class="server-dropdown-header">
+                    <h3>Configurar Servidor</h3>
+                    <button class="close-dropdown" id="close-dropdown">×</button>
+                </div>
+                <div class="server-options">
+                    <label for="custom-server">URL do Servidor:</label>
+                    <input type="text" id="custom-server" placeholder="https://seu-servidor.com" />
+                    <div class="server-presets">
+                        <button class="preset-btn" data-url="https://consultancy-breast-za-recorded.trycloudflare.com">Cloudflare Tunnel</button>
+                        <button class="preset-btn" data-url="http://localhost:3001">Localhost</button>
+                        <button class="preset-btn" data-url="https://crash-rocket-server.railway.app">Railway</button>
+                    </div>
+                    <div class="server-actions">
+                        <button class="test-connection-btn" id="test-connection">Testar Conexão</button>
+                        <button class="save-server-btn" id="save-server">Salvar & Conectar</button>
+                    </div>
+                    <div class="connection-status" id="connection-status-text">
+                        <span class="status-text">Desconectado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Controle -->
+        <div class="control-panel">
+            <div class="panel-header">
+                <h2>Foguetinho</h2>
+            </div>
+            
+            <!-- Player Info -->
+            <div class="player-info-section">
+                <div class="player-name-container">
+                    <span id="player-name" class="current-player-name">Jogador</span>
+                    <button id="edit-name-btn" class="edit-name-btn" title="Editar nome">✏️</button>
+                </div>
+                <div class="player-balance">
+                    <span>Saldo: R$ <span id="player-balance">1000.00</span></span>
+                </div>
+            </div>
+            
+            <!-- Toggle Normal/Auto -->
+            <div class="mode-toggle">
+                <button class="toggle-btn active" data-mode="manual">Normal</button>
+                <button class="toggle-btn" data-mode="auto">Auto</button>
+            </div>
+            
+            <!-- Input de Quantia -->
+            <div class="bet-section">
+                <label for="bet-amount">Quantia (R$)</label>
+                <div class="bet-input-container">
+                    <input type="number" id="bet-amount" value="10.00" min="1" step="0.01">
+                    <div class="bet-controls">
+                        <button class="bet-control-btn" data-action="half">½</button>
+                        <button class="bet-control-btn" data-action="double">2×</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Auto Cash Out -->
+            <div class="auto-cashout-section">
+                <div class="auto-cashout-toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="auto-cashout">
+                        <span class="slider"></span>
+                    </label>
+                    <span>Auto Retirar</span>
+                </div>
+                <input type="number" id="auto-cashout-value" value="2.00" min="1.01" step="0.01" disabled>
+            </div>
+            
+            <!-- Botões de Ação -->
+            <div class="action-buttons">
+                <button class="clear-btn">Limpar</button>
+                <button class="start-button" id="main-action-btn">
+                    <span class="btn-text">Começar o jogo</span>
+                    <div class="btn-loading hidden">
+                        <div class="spinner"></div>
+                    </div>
+                </button>
+            </div>
+            
+            <!-- Informações do Jogador -->
+            <div class="player-info">
+                <div class="balance">
+                    <span>Saldo: R$ <span id="player-balance">1000.00</span></span>
+                </div>
+                <div class="last-win" id="last-win" style="display: none;">
+                    <span>Última vitória: R$ <span id="last-win-amount">0.00</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Área Principal do Jogo -->
+        <div class="game-area">
+            <!-- Canvas do Jogo -->
+            <div class="canvas-container">
+                <canvas id="gameCanvas" class="game-canvas"></canvas>
+                
+                <!-- Overlay de Informações -->
+                <div class="game-overlay">
+                    <!-- Multiplicador Central -->
+                    <div class="multiplier-display" id="multiplier">1.00X</div>
+                    
+                    <!-- Countdown -->
+                    <div class="countdown hidden" id="countdown">Começando em 3.0s</div>
+                    
+                    <!-- Status de Crash -->
+                    <div class="crash-status hidden" id="crash-status">
+                        <span class="crash-text">CRASHED!</span>
+                        <span class="crash-multiplier" id="crash-multiplier">2.45X</span>
+                    </div>
+                    
+                    <!-- Waiting Screen -->
+                    <div class="waiting-screen hidden" id="waiting-screen">
+                        <div class="waiting-text">Próximo jogo em</div>
+                        <div class="waiting-timer" id="waiting-timer">5.2s</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Histórico de Resultados -->
+            <div class="history-section">
+                <h3>Histórico</h3>
+                <div class="history-container" id="history-container">
+                    <!-- Itens do histórico serão adicionados dinamicamente -->
+                </div>
+            </div>
+            
+            <!-- Jogadores Online (Placeholder) -->
+            <div class="players-section">
+                <h3>Jogadores Online</h3>
+                <div class="players-list" id="players-list">
+                    <div class="player-item">
+                        <span class="player-name">Jogador1</span>
+                        <span class="player-cashout">Retirou em 2.34x</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Edição de Nome -->
+    <div id="name-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Editar Nome</h3>
+            <input type="text" id="name-input" placeholder="Digite seu nome" maxlength="20">
+            <div class="modal-actions">
+                <button id="confirm-name" class="confirm-btn">Salvar</button>
+                <button id="cancel-name" class="cancel-btn">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="js/canvas.js"></script>
+    <script src="js/socket.js"></script>
+    <script src="js/server-selector.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

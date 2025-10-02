@@ -1,0 +1,19 @@
+{
+  "name": "crash-rocket-game",
+  "version": "1.0.0",
+  "description": "Jogo Crash Rocket com HTML5 Canvas e WebSockets",
+  "scripts": {
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && live-server --port=8080\"",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "server": "cd server && npm start",
+    "client": "cd client && live-server --port=8080"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0",
+    "live-server": "^1.2.2"
+  },
+  "keywords": ["crash", "rocket", "game", "websockets", "canvas"],
+  "author": "Henrique",
+  "license": "MIT"
+}

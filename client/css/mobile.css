@@ -1,0 +1,354 @@
+/* Mobile-specific styles and optimizations */
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .game-container {
+        flex-direction: column;
+    }
+    
+    /* Server selector mobile */
+    .server-selector {
+        top: 10px;
+        right: 10px;
+    }
+    
+    .server-dropdown {
+        min-width: 300px;
+        right: -100px;
+        padding: 1rem;
+    }
+    
+    .server-actions {
+        flex-direction: column;
+    }
+    
+    .test-connection-btn,
+    .save-server-btn {
+        margin-bottom: 0.5rem;
+    }
+    
+    .control-panel {
+        margin: 0.75rem;
+        padding: 1rem;
+        order: 2;
+    }
+    
+    .game-area {
+        order: 1;
+        padding: 0.75rem;
+        margin-bottom: 0;
+    }
+    
+    .canvas-container {
+        min-height: 50vh;
+        margin-bottom: 1rem;
+    }
+    
+    .multiplier-display {
+        font-size: clamp(1.5rem, 6vw, 2.5rem);
+        top: 15%;
+    }
+    
+    .countdown {
+        font-size: 1.5rem;
+        padding: 0.75rem 1.5rem;
+    }
+    
+    .crash-status {
+        padding: 1rem 1.5rem;
+    }
+    
+    .crash-text {
+        font-size: 1.5rem;
+    }
+    
+    .crash-multiplier {
+        font-size: 1.2rem;
+    }
+    
+    .waiting-screen {
+        padding: 1rem 1.5rem;
+    }
+    
+    .waiting-timer {
+        font-size: 1.5rem;
+    }
+    
+    /* Compact panel layout */
+    .panel-header h2 {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    
+    .mode-toggle {
+        margin-bottom: 1rem;
+    }
+    
+    .bet-section {
+        margin-bottom: 1rem;
+    }
+    
+    .auto-cashout-section {
+        margin-bottom: 1rem;
+    }
+    
+    .action-buttons {
+        margin-bottom: 1rem;
+    }
+    
+    /* Touch-friendly controls */
+    .toggle-btn {
+        padding: 0.875rem 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    #bet-amount {
+        padding: 0.875rem;
+        font-size: 1rem;
+    }
+    
+    .bet-control-btn {
+        padding: 0.875rem 0.625rem;
+        min-width: 45px;
+        font-size: 0.9rem;
+    }
+    
+    .start-button {
+        padding: 1.125rem 2rem;
+        font-size: 1rem;
+        min-height: 55px;
+    }
+    
+    .clear-btn {
+        padding: 0.875rem;
+        font-size: 0.9rem;
+    }
+    
+    /* History adjustments */
+    .history-container {
+        gap: 0.375rem;
+        padding: 0.375rem 0;
+    }
+    
+    .history-item {
+        min-width: 55px;
+        height: 35px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+    .control-panel {
+        margin: 0.5rem;
+        padding: 0.875rem;
+    }
+    
+    .game-area {
+        padding: 0.5rem;
+    }
+    
+    .canvas-container {
+        min-height: 45vh;
+        border-radius: 8px;
+    }
+    
+    .multiplier-display {
+        font-size: clamp(1.25rem, 5vw, 2rem);
+        top: 12%;
+    }
+    
+    .countdown {
+        font-size: 1.25rem;
+        padding: 0.625rem 1.25rem;
+    }
+    
+    .panel-header h2 {
+        font-size: 1.125rem;
+        margin-bottom: 0.875rem;
+    }
+    
+    /* Ultra-compact layout */
+    .bet-input-container {
+        flex-direction: column;
+        gap: 0.375rem;
+    }
+    
+    .bet-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .bet-control-btn {
+        flex: 1;
+        margin: 0 0.125rem;
+    }
+    
+    .auto-cashout-toggle {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .switch {
+        align-self: flex-start;
+    }
+    
+    /* Smaller history items */
+    .history-item {
+        min-width: 50px;
+        height: 32px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Landscape mobile adjustments */
+@media (max-width: 767px) and (orientation: landscape) {
+    .game-container {
+        flex-direction: row;
+        height: 100vh;
+    }
+    
+    .control-panel {
+        width: 280px;
+        height: 100vh;
+        overflow-y: auto;
+        margin: 0;
+        border-radius: 0;
+        order: 1;
+    }
+    
+    .game-area {
+        flex: 1;
+        order: 2;
+        padding: 0.5rem;
+        height: 100vh;
+    }
+    
+    .canvas-container {
+        min-height: calc(100vh - 150px);
+        margin-bottom: 0.75rem;
+    }
+    
+    .multiplier-display {
+        font-size: clamp(1.5rem, 4vw, 2.5rem);
+        top: 15%;
+    }
+    
+    .history-section {
+        margin-bottom: 0.75rem;
+    }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase touch targets */
+    .toggle-btn {
+        min-height: 44px;
+    }
+    
+    .bet-control-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    .start-button {
+        min-height: 48px;
+    }
+    
+    .clear-btn {
+        min-height: 44px;
+    }
+    
+    .switch {
+        width: 56px;
+        height: 30px;
+    }
+    
+    .slider:before {
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        bottom: 4px;
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    
+    /* Remove hover effects on touch devices */
+    .start-button:hover {
+        transform: none;
+        box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);
+    }
+    
+    .bet-control-btn:hover {
+        background: rgba(45, 55, 72, 0.8);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .clear-btn:hover {
+        background: transparent;
+        color: #a0aec0;
+    }
+    
+    .history-item:hover {
+        transform: none;
+    }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* Crisp borders and shadows */
+    .control-panel {
+        border: 0.5px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .canvas-container {
+        border: 0.5px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .toggle-btn.active {
+        box-shadow: 0 1px 4px rgba(229, 62, 62, 0.3);
+    }
+    
+    .start-button:hover {
+        box-shadow: 0 5px 12.5px rgba(229, 62, 62, 0.4);
+    }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .multiplier-display {
+        transition: none;
+    }
+    
+    .countdown {
+        transition: none;
+    }
+    
+    .spinner {
+        animation: none;
+    }
+}
+
+/* Dark mode support (if system preference changes) */
+@media (prefers-color-scheme: dark) {
+    /* Already using dark theme, but ensure consistency */
+    body {
+        background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    }
+}
+
+/* Print styles (hide game elements) */
+@media print {
+    .game-container {
+        display: none;
+    }
+}
