@@ -1,5 +1,7 @@
 // Socket.IO client connection and event handling
 
+const DEFAULT_TUNNEL_URL = 'https://inf-abraham-query-artistic.trycloudflare.com';
+
 class SocketManager {
     constructor() {
         this.socket = null;
@@ -27,19 +29,27 @@ class SocketManager {
     
     loadServerUrl() {
         // Tentar carregar URL salva no localStorage
-        const savedUrl = localStorage.getItem('crash-rocket-server-url');
-        
-        if (savedUrl) {
-            this.currentServerUrl = savedUrl;
-        } else {
-            // URLs padrão baseadas no ambiente
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    this.currentServerUrl = 'https://sea-austin-technological-fold.trycloudflare.com';
-                } else {
-                    this.currentServerUrl = 'https://sea-austin-technological-fold.trycloudflare.com';
-            }
+        let savedUrl = null;
+
+        try {
+            savedUrl = localStorage.getItem('crash-rocket-server-url');
+        } catch (error) {
+            console.warn('⚠️ Não foi possível acessar o localStorage:', error);
         }
-        
+
+        if (savedUrl && this.isValidUrl(savedUrl)) {
+            if (this.isDeprecatedTunnelUrl(savedUrl)) {
+                console.log('♻️ Atualizando URL do túnel salva para o novo endereço padrão.');
+                this.persistServerUrl(DEFAULT_TUNNEL_URL);
+                this.currentServerUrl = DEFAULT_TUNNEL_URL;
+            } else {
+                this.currentServerUrl = savedUrl;
+            }
+        } else {
+            this.currentServerUrl = this.resolveDefaultUrl();
+            this.persistServerUrl(this.currentServerUrl);
+        }
+
         console.log('🔌 URL do servidor carregada:', this.currentServerUrl);
         this.connect();
     }
@@ -51,7 +61,7 @@ class SocketManager {
         }
         
         this.currentServerUrl = url;
-        localStorage.setItem('crash-rocket-server-url', url);
+        this.persistServerUrl(url);
         
         // Reconectar com nova URL
         this.disconnect();
@@ -67,6 +77,32 @@ class SocketManager {
         }
     }
     
+    resolveDefaultUrl() {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return DEFAULT_TUNNEL_URL;
+        }
+        return DEFAULT_TUNNEL_URL;
+    }
+
+    isDeprecatedTunnelUrl(url) {
+        if (!url) {
+            return false;
+        }
+        const normalized = url.trim().toLowerCase();
+        if (!normalized.includes('trycloudflare.com')) {
+            return false;
+        }
+        return normalized !== DEFAULT_TUNNEL_URL.toLowerCase();
+    }
+
+    persistServerUrl(url) {
+        try {
+            localStorage.setItem('crash-rocket-server-url', url);
+        } catch (error) {
+            console.warn('⚠️ Não foi possível salvar a URL do servidor no localStorage:', error);
+        }
+    }
+
     async testConnection(url) {
         return new Promise((resolve) => {
             const testSocket = io(url, {
@@ -188,6 +224,14 @@ class SocketManager {
             this.emit('bet_placed', data);
         });
 
+        this.socket.on('leaderboard_update', (data) => {
+            this.emit('leaderboard_update', data);
+        });
+
+        this.socket.on('leaderboard_rank', (data) => {
+            this.emit('leaderboard_rank', data);
+        });
+
         this.socket.on('error', (data) => {
             console.error('🚨 Erro do servidor:', data);
             this.emit('server_error', data);
@@ -271,6 +315,44 @@ class SocketManager {
         const number = Math.floor(Math.random() * 999) + 1;
         
         return `${adj}${noun}${number}`;
+    }
+
+    resolveAdminBaseUrl() {
+        let base = (this.currentServerUrl || '').trim();
+        if (!base || base.includes('vercel.app')) {
+            base = DEFAULT_TUNNEL_URL;
+        }
+
+        if (!this.isValidUrl(base)) {
+            throw new Error('URL do servidor inválida para o comando admin');
+        }
+
+        return base.replace(/\/$/, '');
+    }
+
+    async forceCrash(token = null, reason = 'manual_override') {
+        const baseUrl = this.resolveAdminBaseUrl();
+        const targetUrl = `${baseUrl}/admin/force-crash`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['X-Admin-Token'] = token;
+        }
+
+        const payload = token ? { token, reason } : { reason };
+
+        const response = await fetch(targetUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorPayload = await response.json().catch(() => ({}));
+            const message = errorPayload?.error || `Falha ao forçar crash (${response.status})`;
+            throw new Error(message);
+        }
+
+        return response.json();
     }
     
     // Connection management

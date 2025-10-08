@@ -70,10 +70,19 @@ class Game {
 
         // Alimentar linha também pelos updates de multiplicador suaves
         this.socketManager.on('multiplier_update', (data) => {
-            if (this.gameState === 'flying' && typeof data.multiplier === 'number' && typeof data.time === 'number') {
-                this.currentMultiplier = data.multiplier;
-                this.rocketCurve.addPoint(data.time, data.multiplier);
-                this.uiManager.updateMultiplier(data.multiplier);
+            if (this.gameState === 'flying' && typeof data === 'object') {
+                const rawMultiplier = typeof data.multiplier === 'number' ? data.multiplier : null;
+                const displayMultiplier = typeof data.displayMultiplier === 'number'
+                    ? data.displayMultiplier
+                    : (rawMultiplier !== null ? Number(rawMultiplier.toFixed(2)) : null);
+
+                if (rawMultiplier !== null) {
+                    this.currentMultiplier = rawMultiplier;
+                }
+
+                if (displayMultiplier !== null) {
+                    this.uiManager.updateMultiplier(displayMultiplier);
+                }
             }
         });
         
@@ -183,23 +192,29 @@ class Game {
     }
     
     handleFlyingState(data) {
-        const { multiplier, time } = data;
+        const rawMultiplier = typeof data.multiplier === 'number'
+            ? data.multiplier
+            : (typeof data.displayMultiplier === 'number' ? data.displayMultiplier : this.currentMultiplier);
+        const displayMultiplier = typeof data.displayMultiplier === 'number'
+            ? data.displayMultiplier
+            : Number(rawMultiplier.toFixed(2));
+        const timeValue = typeof data.time === 'number' ? data.time : 0;
         
         // Update game state
-        this.currentMultiplier = multiplier;
+        this.currentMultiplier = rawMultiplier;
         
         if (!this.gameStartTime) {
-            this.gameStartTime = Date.now() - (time * 1000);
+            this.gameStartTime = Date.now() - (timeValue * 1000);
         }
         
         // Add point to curve
-        this.rocketCurve.addPoint(time, multiplier);
+        this.rocketCurve.addPoint(timeValue, rawMultiplier);
         
         // Update UI
-        this.uiManager.setGameState('flying', { multiplier });
+        this.uiManager.setGameState('flying', { multiplier: displayMultiplier });
         
         // Check auto cash out
-        this.checkAutoCashOut(multiplier);
+        this.checkAutoCashOut(rawMultiplier);
     }
     
     handleCrashedState(data) {
@@ -288,11 +303,15 @@ class Game {
         
         // Draw grid using dynamic Y scale (start at 2x, smooth zoom-out)
         let yMaxForGrid = 2;
+        let timeWindowForGrid = 30;
         if (this.rocketCurve) {
             const yMaxNext = Math.max(1.01, this.rocketCurve.yMax + (this.rocketCurve.yMaxTarget - this.rocketCurve.yMax) * 0.15);
             yMaxForGrid = Math.max(2, yMaxNext);
+            if (typeof this.rocketCurve.getWindowSize === 'function') {
+                timeWindowForGrid = this.rocketCurve.getWindowSize();
+            }
         }
-        this.canvasManager.drawGrid(1, yMaxForGrid);
+        this.canvasManager.drawGrid(1, yMaxForGrid, timeWindowForGrid);
         
         // Draw rocket curve
         if (this.gameState === 'flying' || this.gameState === 'crashed') {

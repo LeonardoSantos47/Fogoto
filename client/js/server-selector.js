@@ -4,8 +4,15 @@ class ServerSelector {
     constructor() {
         this.isOpen = false;
         this.currentUrl = '';
+        this.isDisabled = false;
         
         this.initializeElements();
+        if (!this.elements.indicator || !this.elements.btn || !this.elements.dropdown) {
+            console.warn('Server selector UI not found; feature disabled.');
+            this.isDisabled = true;
+            return;
+        }
+
         this.setupEventListeners();
         this.updateStatus();
     }
@@ -27,6 +34,7 @@ class ServerSelector {
     }
     
     setupEventListeners() {
+        if (this.isDisabled) return;
         // Toggle dropdown
         this.elements.btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -86,6 +94,7 @@ class ServerSelector {
     }
     
     toggleDropdown() {
+        if (this.isDisabled) return;
         if (this.isOpen) {
             this.closeDropdown();
         } else {
@@ -94,6 +103,7 @@ class ServerSelector {
     }
     
     openDropdown() {
+        if (this.isDisabled) return;
         this.isOpen = true;
         this.elements.dropdown.classList.remove('hidden');
         
@@ -110,12 +120,14 @@ class ServerSelector {
     }
     
     closeDropdown() {
+        if (this.isDisabled) return;
         this.isOpen = false;
         this.elements.dropdown.classList.add('hidden');
         this.clearHighlights();
     }
     
     highlightPreset(btn) {
+        if (this.isDisabled) return;
         this.clearHighlights();
         btn.style.background = 'rgba(229, 62, 62, 0.3)';
         btn.style.borderColor = '#e53e3e';
@@ -123,6 +135,7 @@ class ServerSelector {
     }
     
     highlightCurrentPreset() {
+        if (this.isDisabled) return;
         const currentUrl = this.elements.customInput.value;
         this.elements.presetBtns.forEach(btn => {
             if (btn.dataset.url === currentUrl) {
@@ -132,6 +145,7 @@ class ServerSelector {
     }
     
     clearHighlights() {
+        if (this.isDisabled) return;
         this.elements.presetBtns.forEach(btn => {
             btn.style.background = '';
             btn.style.borderColor = '';
@@ -140,6 +154,7 @@ class ServerSelector {
     }
     
     async testConnection() {
+        if (this.isDisabled) return;
         const url = this.elements.customInput.value.trim();
         
         if (!url) {
@@ -178,6 +193,7 @@ class ServerSelector {
     }
     
     saveAndConnect() {
+        if (this.isDisabled) return;
         const url = this.elements.customInput.value.trim();
         
         if (!url) {
@@ -205,6 +221,7 @@ class ServerSelector {
     }
     
     updateConnectionStatus(connected) {
+        if (this.isDisabled) return;
         this.elements.indicator.className = connected ? 
             'server-indicator connected' : 
             'server-indicator disconnected';
@@ -213,11 +230,13 @@ class ServerSelector {
     }
     
     updateTestStatus(status, message) {
+        if (this.isDisabled) return;
         this.elements.statusText.className = `connection-status ${status}`;
         this.elements.statusText.querySelector('.status-text').textContent = message;
     }
     
     updateStatus() {
+        if (this.isDisabled) return;
         if (window.socketManager) {
             const status = window.socketManager.getConnectionStatus();
             this.updateConnectionStatus(status.connected);
@@ -250,6 +269,7 @@ class ServerSelector {
     }
     
     setServerUrl(url) {
+        if (this.isDisabled) return;
         this.elements.customInput.value = url;
         this.saveAndConnect();
     }
@@ -258,7 +278,7 @@ class ServerSelector {
     getPresetUrls() {
         return {
             localhost: 'http://localhost:3001',
-            cloudflare: 'https://sea-austin-technological-fold.trycloudflare.com',
+            cloudflare: 'https://elected-design-jets-repair.trycloudflare.com',
             railway: 'https://crash-rocket-server.railway.app'
         };
     }
@@ -275,6 +295,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Update status when socket manager is ready
     const checkSocketManager = () => {
+        if (serverSelector.isDisabled) {
+            return;
+        }
         if (window.socketManager) {
             serverSelector.setupEventListeners();
             serverSelector.updateStatus();

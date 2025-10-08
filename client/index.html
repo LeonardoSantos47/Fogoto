@@ -12,37 +12,6 @@
 </head>
 <body>
     <div class="game-container">
-        <!-- Seletor de Servidor -->
-        <div class="server-selector">
-            <div class="server-indicator" id="server-indicator">
-                <div class="server-dot" id="server-dot"></div>
-                <span class="server-text" id="server-text">Servidor</span>
-                <button class="server-btn" id="server-btn">⚙️</button>
-            </div>
-            <div class="server-dropdown hidden" id="server-dropdown">
-                <div class="server-dropdown-header">
-                    <h3>Configurar Servidor</h3>
-                    <button class="close-dropdown" id="close-dropdown">×</button>
-                </div>
-                <div class="server-options">
-                    <label for="custom-server">URL do Servidor:</label>
-                    <input type="text" id="custom-server" placeholder="https://seu-servidor.com" />
-                    <div class="server-presets">
-                        <button class="preset-btn" data-url="https://sea-austin-technological-fold.trycloudflare.com">Cloudflare Tunnel</button>
-                        <button class="preset-btn" data-url="http://localhost:3001">Localhost</button>
-                        <button class="preset-btn" data-url="https://crash-rocket-server.railway.app">Railway</button>
-                    </div>
-                    <div class="server-actions">
-                        <button class="test-connection-btn" id="test-connection">Testar Conexão</button>
-                        <button class="save-server-btn" id="save-server">Salvar & Conectar</button>
-                    </div>
-                    <div class="connection-status" id="connection-status-text">
-                        <span class="status-text">Desconectado</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Painel de Controle -->
         <div class="control-panel">
             <div class="panel-header">
@@ -58,12 +27,6 @@
                 <div class="player-balance">
                     <span>Saldo: R$ <span id="player-balance">1000.00</span></span>
                 </div>
-            </div>
-            
-            <!-- Toggle Normal/Auto -->
-            <div class="mode-toggle">
-                <button class="toggle-btn active" data-mode="manual">Normal</button>
-                <button class="toggle-btn" data-mode="auto">Auto</button>
             </div>
             
             <!-- Input de Quantia -->
@@ -82,12 +45,12 @@
             <div class="auto-cashout-section">
                 <div class="auto-cashout-toggle">
                     <label class="switch">
-                        <input type="checkbox" id="auto-cashout">
+                        <input type="checkbox" id="auto-cashout" aria-label="Ativar auto retirar">
                         <span class="slider"></span>
                     </label>
                     <span>Auto Retirar</span>
                 </div>
-                <input type="number" id="auto-cashout-value" value="2.00" min="1.01" step="0.01" disabled>
+                <input type="number" id="auto-cashout-value" value="2.00" min="1.01" step="0.01" disabled aria-label="Multiplicador para auto retirar">
             </div>
             
             <!-- Botões de Ação -->
@@ -103,10 +66,7 @@
             
             <!-- Informações do Jogador -->
             <div class="player-info">
-                <div class="balance">
-                    <span>Saldo: R$ <span id="player-balance">1000.00</span></span>
-                </div>
-                <div class="last-win" id="last-win" style="display: none;">
+                <div class="last-win" id="last-win">
                     <span>Última vitória: R$ <span id="last-win-amount">0.00</span></span>
                 </div>
             </div>
@@ -147,14 +107,28 @@
                     <!-- Itens do histórico serão adicionados dinamicamente -->
                 </div>
             </div>
-            
-            <!-- Jogadores Online (Placeholder) -->
-            <div class="players-section">
-                <h3>Jogadores Online</h3>
-                <div class="players-list" id="players-list">
-                    <div class="player-item">
-                        <span class="player-name">Jogador1</span>
-                        <span class="player-cashout">Retirou em 2.34x</span>
+
+            <!-- Leaderboard -->
+            <div class="leaderboard-section">
+                <div class="leaderboard-header">
+                    <h3>Leaderboard</h3>
+                    <span class="leaderboard-updated" id="leaderboard-updated">Atualizado agora</span>
+                </div>
+                <div class="leaderboard-list" id="leaderboard-list" aria-live="polite">
+                    <div class="leaderboard-placeholder" id="leaderboard-placeholder">
+                        <span>Nenhum destaque ainda. Seja o primeiro a liderar!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card de posição do jogador -->
+            <div class="player-rank-card hidden" id="player-rank-card" aria-live="polite">
+                <div class="player-rank-content">
+                    <div class="player-rank-label">Sua posição</div>
+                    <div class="player-rank-number" id="player-rank-number">-</div>
+                    <div class="player-rank-details" id="player-rank-details">Jogue para entrar no ranking</div>
+                    <div class="player-rank-progress">
+                        <div class="player-rank-progress-bar" id="player-rank-progress"></div>
                     </div>
                 </div>
             </div>

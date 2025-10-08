@@ -9,9 +9,25 @@ class UIManager {
         this.isAutoCashOut = false;
         this.autoCashOutValue = 2.00;
         this.isPlaying = false;
-    this.isPlacingBet = false;
-    // Visual counter
-    this.multiplierCounter = { displayed: 1.0, target: 1.0 };
+        this.isPlacingBet = false;
+        // Visual counter
+        this.multiplierCounter = { displayed: 1.0, target: 1.0 };
+        this.currencyFormatter = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+        });
+        this.numberFormatter = new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        this.currentPlayerId = null;
+        this.leaderboardItemCache = new Map();
+        this.leaderboardState = {
+            lastUpdate: null,
+            totalPlayers: 0
+        };
+        this.leaderboardTimestampInterval = null;
         
         this.initializeElements();
         this.setupEventListeners();
@@ -34,10 +50,13 @@ class UIManager {
                 
                 window.socketManager.on('multiplier_update', (data) => {
                     // Atualização via servidor com menos ruído
-                    if (typeof data.multiplier === 'number') {
-                        this.multiplierCounter.target = data.multiplier;
+                    if (data && (typeof data.multiplier === 'number' || typeof data.displayMultiplier === 'number')) {
+                        const display = typeof data.displayMultiplier === 'number'
+                            ? data.displayMultiplier
+                            : Number(data.multiplier.toFixed(2));
+                        this.multiplierCounter.target = display;
                         // Atualiza exibição suavizada; o gráfico é alimentado via game.js
-                        this.updateMultiplier(data.multiplier);
+                        this.updateMultiplier(display);
                     }
                 });
                 
@@ -69,6 +88,14 @@ class UIManager {
                     this.handlePlayerCashedOut(data);
                 });
                 
+                window.socketManager.on('leaderboard_update', (data) => {
+                    this.handleLeaderboardUpdate(data);
+                });
+
+                window.socketManager.on('leaderboard_rank', (data) => {
+                    this.handleLeaderboardRank(data);
+                });
+
                 window.socketManager.on('connection_status', (data) => {
                     console.log('🔗 Status conexão:', data);
                     this.handleConnectionStatus(data);
@@ -117,9 +144,14 @@ class UIManager {
             
             // History
             historyContainer: document.getElementById('history-container'),
-            
-            // Players
-            playersList: document.getElementById('players-list')
+            leaderboardSection: document.querySelector('.leaderboard-section'),
+            leaderboardList: document.getElementById('leaderboard-list'),
+            leaderboardPlaceholder: document.getElementById('leaderboard-placeholder'),
+            leaderboardUpdated: document.getElementById('leaderboard-updated'),
+            playerRankCard: document.getElementById('player-rank-card'),
+            playerRankNumber: document.getElementById('player-rank-number'),
+            playerRankDetails: document.getElementById('player-rank-details'),
+            playerRankProgress: document.getElementById('player-rank-progress'),
         };
     }
     
@@ -152,6 +184,7 @@ class UIManager {
         this.elements.startBtn.addEventListener('click', () => {
             this.handleMainAction();
         });
+
         
         // Bet amount validation
         this.elements.betAmount.addEventListener('input', (e) => {
@@ -538,8 +571,11 @@ class UIManager {
         this.elements.countdown.classList.add('hidden');
         this.elements.crashStatus.classList.add('hidden');
         
-        if (data.multiplier) {
-            this.updateMultiplier(data.multiplier);
+        const multiplier = typeof data.multiplier === 'number'
+            ? data.multiplier
+            : (typeof data.displayMultiplier === 'number' ? data.displayMultiplier : null);
+        if (multiplier !== null) {
+            this.updateMultiplier(multiplier);
         }
     }
     
@@ -669,19 +705,438 @@ class UIManager {
     }
     
     handlePlayerCashedOut(data) {
-        if (data.isCurrentPlayer) {
-            const winAmount = data.amount;
-            this.playerBalance += winAmount;
+        const isCurrentPlayer = !!(data && data.isCurrentPlayer);
+        const totalPayout = typeof data?.amount === 'number' ? data.amount : 0;
+        const betAmount = typeof data?.betAmount === 'number' ? data.betAmount : this.currentBet;
+        const providedBalance = typeof data?.balance === 'number' ? data.balance : null;
+        const profit = Math.max(0, totalPayout - (betAmount || 0));
+
+        if (isCurrentPlayer) {
+            if (providedBalance !== null) {
+                this.playerBalance = providedBalance;
+            } else if (totalPayout > 0) {
+                this.playerBalance += totalPayout;
+            }
             this.updateBalance();
-            this.showLastWin(winAmount);
-            this.showNotification(`Você retirou R$ ${winAmount.toFixed(2)}!`, 'success');
+
+            if (totalPayout > 0) {
+                this.showLastWin(profit || totalPayout);
+            }
+
+            const formattedPayout = totalPayout > 0 ? totalPayout.toFixed(2) : null;
+            const formattedProfit = profit.toFixed(2);
+            const message = formattedPayout
+                ? (profit > 0
+                    ? `Você retirou R$ ${formattedPayout} (lucro R$ ${formattedProfit})!`
+                    : `Você retirou R$ ${formattedPayout}!`)
+                : 'Retirada realizada!';
+            this.showNotification(message, 'success');
+
+            this.currentBet = 0;
             this.isPlaying = false;
+            this.isPlacingBet = false;
         }
         
         this.updateStartButton();
     }
-    
-    
+
+    handleLeaderboardUpdate(data = {}) {
+        const entries = this.normalizeLeaderboardEntries(data.entries, 10);
+        this.leaderboardState.lastUpdate = data.updatedAt || Date.now();
+        this.leaderboardState.totalPlayers = data.totalPlayers || entries.filter(entry => !entry.isPlaceholder).length;
+        this.ensureCurrentPlayerId();
+        this.updateLeaderboard(entries, {
+            updatedAt: this.leaderboardState.lastUpdate,
+            totalPlayers: this.leaderboardState.totalPlayers
+        });
+    }
+
+    handleLeaderboardRank(data = {}) {
+        if (typeof data.totalPlayers === 'number') {
+            this.leaderboardState.totalPlayers = data.totalPlayers;
+        }
+        this.updatePlayerRankCard(data);
+        this.ensureCurrentPlayerId();
+        this.refreshLeaderboardHighlight();
+    }
+
+    ensureCurrentPlayerId(force = false) {
+        if (!window.socketManager || typeof window.socketManager.getConnectionStatus !== 'function') {
+            return;
+        }
+        const status = window.socketManager.getConnectionStatus();
+        if (status?.socketId && (force || !this.currentPlayerId)) {
+            this.currentPlayerId = status.socketId;
+        }
+    }
+
+    refreshLeaderboardHighlight() {
+        const list = this.elements.leaderboardList;
+        if (!list) return;
+        const selfId = this.currentPlayerId;
+        Array.from(list.querySelectorAll('.leaderboard-item')).forEach(node => {
+            const id = node.dataset.playerId;
+            const isPlaceholder = node.dataset.placeholder === 'true';
+            node.classList.toggle('is-self', Boolean(selfId && id === selfId && !isPlaceholder));
+        });
+    }
+
+    normalizeLeaderboardEntries(rawEntries = [], desiredLength = 10) {
+        const entries = Array.isArray(rawEntries) ? rawEntries.slice(0, desiredLength) : [];
+
+        const normalized = entries.map((entry, index) => {
+            const id = entry?.playerId || entry?.id;
+            return {
+                ...entry,
+                rank: typeof entry?.rank === 'number' ? entry.rank : index + 1,
+                id: id,
+                playerId: id,
+                isPlaceholder: false
+            };
+        });
+
+        while (normalized.length < desiredLength) {
+            const rank = normalized.length + 1;
+            normalized.push({
+                rank,
+                id: `placeholder-${rank}`,
+                playerId: `placeholder-${rank}`,
+                name: 'Aguardando jogador',
+                balance: 0,
+                profit: 0,
+                gamesPlayed: 0,
+                biggestWin: 0,
+                longestStreak: 0,
+                isPlaceholder: true
+            });
+        }
+
+        return normalized;
+    }
+
+    updateLeaderboard(entries = [], meta = {}) {
+        const list = this.elements.leaderboardList;
+        const placeholder = this.elements.leaderboardPlaceholder;
+        if (!list) return;
+
+        const currentItems = Array.from(list.querySelectorAll('.leaderboard-item'));
+        const previousLayout = new Map();
+        currentItems.forEach(node => {
+            previousLayout.set(node.dataset.playerId, {
+                rect: node.getBoundingClientRect()
+            });
+        });
+
+        const availableNodes = new Map(currentItems.map(node => [node.dataset.playerId, node]));
+        const orderedNodes = [];
+        const newNodes = new Map();
+
+        entries.forEach(entry => {
+            const id = entry.playerId || entry.id;
+            if (!id) {
+                return;
+            }
+
+            let node = availableNodes.get(id) || this.leaderboardItemCache.get(id);
+            if (!node) {
+                node = this.createLeaderboardItem(entry);
+            }
+
+            this.leaderboardItemCache.set(id, node);
+            availableNodes.delete(id);
+
+            this.updateLeaderboardItem(node, entry);
+            node.dataset.placeholder = entry.isPlaceholder ? 'true' : 'false';
+
+            orderedNodes.push(node);
+
+            if (!entry.isPlaceholder) {
+                newNodes.set(id, node);
+            }
+        });
+
+        // Remove nós que não fazem mais parte do top 10
+        availableNodes.forEach((node, id) => {
+            node.remove();
+            this.leaderboardItemCache.delete(id);
+        });
+
+        const fragment = document.createDocumentFragment();
+        orderedNodes.forEach(node => fragment.appendChild(node));
+
+        if (placeholder) {
+            placeholder.classList.add('hidden');
+            if (placeholder.parentElement !== list) {
+                list.appendChild(placeholder);
+            }
+            list.insertBefore(fragment, placeholder);
+        } else {
+            list.appendChild(fragment);
+        }
+
+        this.animateLeaderboard(previousLayout, newNodes);
+        this.updateLeaderboardTimestamp(meta.updatedAt);
+        this.startLeaderboardTimestampClock();
+        this.refreshLeaderboardHighlight();
+    }
+
+    createLeaderboardItem(entry) {
+        const item = document.createElement('div');
+        item.className = 'leaderboard-item';
+        item.dataset.playerId = entry.playerId || entry.id;
+        item.setAttribute('role', 'listitem');
+
+        const rank = document.createElement('div');
+        rank.className = 'leaderboard-rank';
+
+        const info = document.createElement('div');
+        info.className = 'leaderboard-info';
+
+        const nameRow = document.createElement('div');
+        nameRow.className = 'leaderboard-name';
+        const nameText = document.createElement('span');
+        nameText.className = 'leaderboard-name-text';
+        nameRow.appendChild(nameText);
+        info.appendChild(nameRow);
+
+        const metaRow = document.createElement('div');
+        metaRow.className = 'leaderboard-meta';
+        info.appendChild(metaRow);
+
+        const scoreWrapper = document.createElement('div');
+        scoreWrapper.className = 'leaderboard-score-wrapper';
+        const score = document.createElement('div');
+        score.className = 'leaderboard-score';
+        const profit = document.createElement('div');
+        profit.className = 'leaderboard-profit';
+        scoreWrapper.appendChild(score);
+        scoreWrapper.appendChild(profit);
+
+        item.appendChild(rank);
+        item.appendChild(info);
+        item.appendChild(scoreWrapper);
+
+        return item;
+    }
+
+    updateLeaderboardItem(node, entry) {
+        if (!node) return;
+        const id = entry.playerId || entry.id;
+        node.dataset.playerId = id;
+        node.dataset.rank = entry.rank;
+        const isPlaceholder = Boolean(entry.isPlaceholder);
+        node.dataset.placeholder = isPlaceholder ? 'true' : 'false';
+
+        node.classList.toggle('top-1', entry.rank === 1);
+        node.classList.toggle('top-2', entry.rank === 2);
+        node.classList.toggle('top-3', entry.rank === 3);
+        node.classList.toggle('is-self', id === this.currentPlayerId && !isPlaceholder);
+        node.classList.toggle('is-placeholder', isPlaceholder);
+
+        const rankEl = node.querySelector('.leaderboard-rank');
+        if (rankEl) {
+            rankEl.textContent = entry.rank;
+        }
+
+        const nameRow = node.querySelector('.leaderboard-name');
+        if (nameRow) {
+            const existingCrown = nameRow.querySelector('.leaderboard-crown');
+            if (!isPlaceholder && entry.rank && entry.rank <= 3) {
+                const crown = this.createCrownElement(entry.rank);
+                if (existingCrown) {
+                    existingCrown.replaceWith(crown);
+                } else {
+                    nameRow.prepend(crown);
+                }
+            } else if (existingCrown) {
+                existingCrown.remove();
+            }
+
+            let nameText = nameRow.querySelector('.leaderboard-name-text');
+            if (!nameText) {
+                nameText = document.createElement('span');
+                nameText.className = 'leaderboard-name-text';
+                nameRow.appendChild(nameText);
+            }
+            nameText.textContent = isPlaceholder ? 'Aguardando jogador' : (entry.name || 'Jogador');
+        }
+
+        const metaRow = node.querySelector('.leaderboard-meta');
+        if (metaRow) {
+            metaRow.innerHTML = '';
+            if (isPlaceholder) {
+                metaRow.appendChild(this.buildMetaChip('Jogos', '--'));
+                metaRow.appendChild(this.buildMetaChip('Maior win', '--'));
+                metaRow.appendChild(this.buildMetaChip('Streak', '--'));
+            } else {
+                metaRow.appendChild(this.buildMetaChip('Jogos', entry.gamesPlayed ?? 0));
+                metaRow.appendChild(this.buildMetaChip('Maior win', this.formatCurrency(entry.biggestWin ?? 0)));
+                metaRow.appendChild(this.buildMetaChip('Streak', `${entry.longestStreak ?? 0}x`));
+            }
+        }
+
+        const score = node.querySelector('.leaderboard-score');
+        if (score) {
+            score.textContent = isPlaceholder ? '--' : this.formatCurrency(entry.balance ?? 0);
+        }
+
+        const profit = node.querySelector('.leaderboard-profit');
+        if (profit) {
+            if (isPlaceholder) {
+                profit.textContent = 'Sem dados suficientes';
+                profit.classList.remove('negative');
+            } else {
+                const profitInfo = this.formatProfit(entry.profit ?? (entry.balance - 1000));
+                profit.textContent = `Lucro ${profitInfo.text}`;
+                profit.classList.toggle('negative', profitInfo.isNegative);
+            }
+        }
+    }
+
+    buildMetaChip(label, value) {
+        const span = document.createElement('span');
+        span.textContent = `${label}: ${value}`;
+        return span;
+    }
+
+    createCrownElement(rank) {
+        const span = document.createElement('span');
+        span.className = 'leaderboard-crown';
+        const colors = {
+            1: '#ffd700',
+            2: '#c0c0c0',
+            3: '#cd7f32'
+        };
+        const color = colors[rank] || '#a0aec0';
+        span.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M4 6l3.5 5 4.5-6 4.5 6L20 6v11H4V6z" fill="${color}" stroke="rgba(0,0,0,0.15)" stroke-width="1" stroke-linejoin="round" />
+            </svg>
+        `;
+        return span;
+    }
+
+    animateLeaderboard(previousLayout, newNodes) {
+        requestAnimationFrame(() => {
+            newNodes.forEach((node, id) => {
+                const previous = previousLayout.get(id);
+                if (previous) {
+                    const newRect = node.getBoundingClientRect();
+                    const deltaX = previous.rect.left - newRect.left;
+                    const deltaY = previous.rect.top - newRect.top;
+                    if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+                        node.style.transition = 'none';
+                        node.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                        requestAnimationFrame(() => {
+                            node.style.transition = '';
+                            node.style.transform = '';
+                        });
+                    }
+                } else {
+                    node.style.transition = 'none';
+                    node.style.opacity = '0';
+                    node.style.transform = 'translateY(-12px)';
+                    requestAnimationFrame(() => {
+                        node.style.transition = '';
+                        node.style.opacity = '1';
+                        node.style.transform = '';
+                    });
+                }
+            });
+        });
+    }
+
+    updateLeaderboardTimestamp(updatedAt) {
+        const label = this.elements.leaderboardUpdated;
+        if (!label) return;
+
+        if (!updatedAt) {
+            label.textContent = 'Atualizado agora';
+            return;
+        }
+
+        const diff = Math.max(0, Date.now() - updatedAt);
+        let message;
+        if (diff < 4000) {
+            message = 'Atualizado agora';
+        } else if (diff < 60000) {
+            const seconds = Math.round(diff / 1000);
+            message = `Atualizado há ${seconds}s`;
+        } else if (diff < 3600000) {
+            const minutes = Math.round(diff / 60000);
+            message = `Atualizado há ${minutes}min`;
+        } else {
+            message = `Atualizado às ${new Date(updatedAt).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            })}`;
+        }
+
+        label.textContent = message;
+    }
+
+    startLeaderboardTimestampClock() {
+        if (this.leaderboardTimestampInterval) {
+            return;
+        }
+        this.leaderboardTimestampInterval = setInterval(() => {
+            if (this.leaderboardState.lastUpdate) {
+                this.updateLeaderboardTimestamp(this.leaderboardState.lastUpdate);
+            }
+        }, 5000);
+    }
+
+    updatePlayerRankCard(data = {}) {
+        const card = this.elements.playerRankCard;
+        const numberEl = this.elements.playerRankNumber;
+        const detailsEl = this.elements.playerRankDetails;
+        const progressEl = this.elements.playerRankProgress;
+
+        if (!card || !numberEl || !detailsEl || !progressEl) {
+            return;
+        }
+
+        const isValidRank = typeof data.rank === 'number' && data.rank >= 1;
+        const totalPlayers = typeof data.totalPlayers === 'number' && data.totalPlayers > 0
+            ? data.totalPlayers
+            : null;
+
+        card.classList.remove('hidden');
+
+        if (!isValidRank || !totalPlayers) {
+            numberEl.textContent = '—';
+            detailsEl.textContent = 'Jogue para entrar no ranking';
+            detailsEl.classList.remove('negative');
+            progressEl.style.width = '0%';
+            return;
+        }
+
+        numberEl.textContent = `#${data.rank}`;
+
+        const balance = this.formatCurrency(data.balance ?? 0);
+        const profitInfo = this.formatProfit(data.profit ?? 0);
+        const progressRatio = totalPlayers > 1
+            ? Math.max(0, Math.min(100, 100 - ((data.rank - 1) / (totalPlayers - 1)) * 100))
+            : 100;
+
+        detailsEl.textContent = `Saldo: ${balance} • Lucro: ${profitInfo.text} • ${data.rank}º de ${totalPlayers}`;
+        detailsEl.classList.toggle('negative', profitInfo.isNegative);
+        progressEl.style.width = `${progressRatio}%`;
+    }
+
+    formatCurrency(value) {
+        const safeValue = Number.isFinite(value) ? value : 0;
+        return this.currencyFormatter.format(safeValue);
+    }
+
+    formatProfit(value) {
+        const profit = Number.isFinite(value) ? value : 0;
+        const absolute = this.currencyFormatter.format(Math.abs(profit));
+        const isNegative = profit < 0;
+        const text = `${isNegative ? '-' : '+'}${absolute}`;
+        return { text, isNegative };
+    }
+
     // Game event handlers
     handleGameState(data) {
         console.log('🎯 Mudando estado:', this.gameState, '->', data.state);
@@ -691,6 +1146,7 @@ class UIManager {
         if (data.state === 'waiting') {
             this.isPlaying = false; // IMPORTANTE: Reset para poder apostar no próximo
             this.isPlacingBet = false;
+            this.currentBet = 0;
             this.elements.countdown.style.display = 'none';
             this.elements.waitingScreen.style.display = 'block';
             const nextIn = typeof data.nextGameIn === 'number' ? data.nextGameIn : (typeof data.timeLeft === 'number' ? data.timeLeft / 1000 : null);
@@ -730,9 +1186,10 @@ class UIManager {
             }
         }
         
-    // Reset player state
-    this.isPlaying = false;
-    this.isPlacingBet = false;
+        // Reset player state
+        this.isPlaying = false;
+        this.isPlacingBet = false;
+        this.currentBet = 0;
         this.updateStartButton();
         
         // Esconder multiplicador
@@ -744,20 +1201,46 @@ class UIManager {
     handleBetPlaced(data) {
         // Limpa estado de envio
         this.isPlacingBet = false;
-        if (data && data.success) {
-            if (!this.isPlaying) {
-                this.isPlaying = true;
-                const amount = data.amount ?? this.currentBet;
-                if (typeof amount === 'number' && amount > 0) {
-                    this.playerBalance -= amount;
-                    this.updateBalance();
-                }
-                this.showNotification(`Aposta de R$ ${(data.amount ?? this.currentBet).toFixed(2)} realizada!`, 'success');
+
+        const success = !!(data && data.success);
+        const providedBalance = typeof data?.balance === 'number' ? data.balance : null;
+        const betAmountRaw = typeof data?.betAmount === 'number'
+            ? data.betAmount
+            : (typeof data?.amount === 'number' ? data.amount : this.currentBet);
+        const hasValidBetAmount = typeof betAmountRaw === 'number' && Number.isFinite(betAmountRaw);
+
+        if (success) {
+            const wasPlaying = this.isPlaying;
+            this.isPlaying = true;
+
+            if (hasValidBetAmount) {
+                this.currentBet = betAmountRaw;
             }
+
+            if (providedBalance !== null) {
+                this.playerBalance = providedBalance;
+            } else if (!wasPlaying && hasValidBetAmount) {
+                this.playerBalance = Math.max(0, this.playerBalance - betAmountRaw);
+            }
+
+            this.updateBalance();
+
+            const displayAmount = typeof this.currentBet === 'number' ? this.currentBet : betAmountRaw;
+            if (typeof displayAmount === 'number' && Number.isFinite(displayAmount)) {
+                this.showNotification(`Aposta de R$ ${displayAmount.toFixed(2)} realizada!`, 'success');
+            } else {
+                this.showNotification('Aposta realizada!', 'success');
+            }
+
             this.updateStartButton();
         } else {
-            // Falhou: libera para tentar novamente
+            if (providedBalance !== null) {
+                this.playerBalance = providedBalance;
+                this.updateBalance();
+            }
+
             this.isPlaying = false;
+            this.currentBet = 0;
             this.updateStartButton();
             this.showNotification((data && data.error) || 'Erro ao fazer aposta', 'error');
         }
@@ -765,6 +1248,8 @@ class UIManager {
     
     handleConnectionStatus(data) {
         if (data.connected) {
+            this.ensureCurrentPlayerId(true);
+            this.refreshLeaderboardHighlight();
             this.showNotification('Conectado ao servidor!', 'success');
         } else {
             this.showNotification('Desconectado do servidor', 'error');
@@ -831,6 +1316,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.uiManager = uiManager;
     // Start smooth multiplier animation
     uiManager.startMultiplierAnimation();
+});
+
+window.addEventListener('beforeunload', () => {
+    if (uiManager && uiManager.leaderboardTimestampInterval) {
+        clearInterval(uiManager.leaderboardTimestampInterval);
+    }
 });
 
 // Export for use in other modules

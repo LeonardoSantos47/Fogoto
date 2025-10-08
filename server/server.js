@@ -26,12 +26,87 @@ class CrashRocketServer {
         this.gameEngine = new GameEngine(this.io);
         this.playerManager = new PlayerManager();
         
-        this.port = process.env.PORT || 3001;
+    this.port = process.env.PORT || 3001;
+    this.adminSecret = process.env.ADMIN_SECRET || null;
         
         this.setupMiddleware();
         this.setupRoutes();
         this.setupSocketHandlers();
         this.startServer();
+    }
+
+    getStartingBalance() {
+        return 1000;
+    }
+
+    buildLeaderboardSnapshot() {
+        const snapshot = this.playerManager.getLeaderboardSnapshot(10);
+        const timestamp = Date.now();
+
+        return {
+            payload: {
+                entries: snapshot.entries.map(entry => ({
+                    rank: entry.rank,
+                    playerId: entry.id,
+                    name: entry.name,
+                    balance: Number(entry.balance.toFixed(2)),
+                    profit: Number(entry.profit.toFixed(2)),
+                    totalWinnings: Number(entry.totalWinnings.toFixed(2)),
+                    biggestWin: Number(entry.biggestWin.toFixed(2)),
+                    longestStreak: entry.longestStreak,
+                    gamesPlayed: entry.gamesPlayed
+                })),
+                totalPlayers: snapshot.totalPlayers,
+                updatedAt: timestamp
+            },
+            sortedPlayers: snapshot.sortedPlayers,
+            timestamp
+        };
+    }
+
+    broadcastLeaderboard() {
+        const { payload, sortedPlayers, timestamp } = this.buildLeaderboardSnapshot();
+        this.io.emit('leaderboard_update', payload);
+        this.sendIndividualRankUpdates(sortedPlayers, timestamp);
+    }
+
+    sendLeaderboardToSocket(socket) {
+        if (!socket) return;
+        const { payload, sortedPlayers, timestamp } = this.buildLeaderboardSnapshot();
+        socket.emit('leaderboard_update', payload);
+        this.sendIndividualRankUpdates(sortedPlayers, timestamp, socket);
+    }
+
+    sendIndividualRankUpdates(sortedPlayers = null, timestamp = Date.now(), targetSocket = null) {
+        const reference = sortedPlayers || this.playerManager.getSortedPlayers();
+        const totalPlayers = reference.length;
+        const baseBalance = this.getStartingBalance();
+
+        reference.forEach((player, index) => {
+            if (targetSocket && player.id !== targetSocket.id) {
+                return;
+            }
+
+            const socket = targetSocket || this.playerManager.getPlayerSocket(player.id);
+            if (!socket) {
+                return;
+            }
+
+            const balance = Number((player.balance || 0).toFixed(2));
+            const profit = Number((balance - baseBalance).toFixed(2));
+
+            socket.emit('leaderboard_rank', {
+                rank: index + 1,
+                totalPlayers,
+                balance,
+                profit,
+                totalWinnings: Number((player.totalWinnings || 0).toFixed(2)),
+                biggestWin: Number((player.biggestWin || 0).toFixed(2)),
+                longestStreak: Number(player.longestStreak || 0),
+                gamesPlayed: Number(player.gamesPlayed || 0),
+                updatedAt: timestamp
+            });
+        });
     }
     
     setupMiddleware() {
@@ -91,6 +166,37 @@ class CrashRocketServer {
                 players: this.playerManager.getStats()
             });
         });
+
+        // Admin: force crash endpoint
+        this.app.post('/admin/force-crash', (req, res) => {
+            try {
+                const token = req.body?.token || req.query?.token || req.headers['x-admin-token'];
+
+                if (this.adminSecret) {
+                    if (!token || token !== this.adminSecret) {
+                        return res.status(401).json({ error: 'Unauthorized' });
+                    }
+                } else {
+                    console.warn('⚠️ ADMIN_SECRET not configured; accepting force crash without token (development mode).');
+                }
+
+                const reason = req.body?.reason || 'admin_api';
+                const result = this.gameEngine.forceCrash(reason);
+
+                if (!result.success) {
+                    return res.status(400).json(result);
+                }
+
+                return res.json({
+                    success: true,
+                    multiplier: result.multiplier,
+                    state: this.gameEngine.getCurrentState()
+                });
+            } catch (error) {
+                console.error('Error handling admin force crash:', error);
+                res.status(500).json({ error: 'Failed to force crash' });
+            }
+        });
         
         // Serve static files in production
         if (process.env.NODE_ENV === 'production') {
@@ -119,6 +225,7 @@ class CrashRocketServer {
             
             // Add player
             this.playerManager.addPlayer(socket.id, socket);
+            this.sendLeaderboardToSocket(socket);
             
             // Send current game state
             const gameState = this.gameEngine.getCurrentState();
@@ -172,7 +279,7 @@ class CrashRocketServer {
                 try {
                     const { amount, autoCashOut } = data;
                     
-                    // Validate bet
+                                    // socket.broadcast.emit('player_cashed_out', {
                     if (!this.isValidBet(amount)) {
                         socket.emit('error', { message: 'Invalid bet amount' });
                         return;
@@ -202,8 +309,15 @@ class CrashRocketServer {
                         
                         console.log(`💰 Player ${socket.id} placed bet: R$ ${amount}`);
                         
-                        // Confirm bet to this player
-                        socket.emit('bet_placed', { success: true, amount });
+                        // Confirm bet to this player com saldo atualizado
+                        const playerBalance = player ? player.balance : null;
+                        socket.emit('bet_placed', {
+                            success: true,
+                            amount,
+                            betAmount: amount,
+                            balance: playerBalance,
+                            autoCashOut: player?.autoCashOut ?? null
+                        });
 
                         // Notify other players
                         this.io.emit('player_bet', {
@@ -226,21 +340,22 @@ class CrashRocketServer {
                     const result = this.gameEngine.cashOut(socket.id);
                     
                     if (result.success) {
+                        const winStats = this.playerManager.recordWin(socket.id, result.winAmount, {
+                            betAmount: result.betAmount,
+                            multiplier: result.multiplier
+                        });
                         const player = this.playerManager.getPlayer(socket.id);
-                        if (player) {
-                            player.isPlaying = false;
-                            player.balance += result.winAmount;
-                            player.totalWinnings += result.winAmount;
-                            player.gamesPlayed++;
-                        }
                         
                         console.log(`💸 Player ${socket.id} cashed out: ${result.multiplier.toFixed(2)}x = R$ ${result.winAmount.toFixed(2)}`);
                         
-                        // Notify player
+                        // Notify player com saldo atualizado
+                        const playerBalance = winStats ? winStats.balance : (player ? Number(player.balance.toFixed(2)) : null);
                         socket.emit('player_cashed_out', {
                             success: true,
                             multiplier: result.multiplier,
                             amount: result.winAmount,
+                            betAmount: result.betAmount,
+                            balance: playerBalance,
                             isCurrentPlayer: true
                         });
                         
@@ -250,6 +365,8 @@ class CrashRocketServer {
                             playerName: player?.name || 'Anonymous',
                             multiplier: result.multiplier,
                             amount: result.winAmount,
+                            betAmount: result.betAmount,
+                            balance: playerBalance,
                             isCurrentPlayer: false
                         });
                     } else {
@@ -293,13 +410,12 @@ class CrashRocketServer {
         });
         
         this.gameEngine.on('player_auto_cashed_out', (data) => {
+            const winStats = this.playerManager.recordWin(data.playerId, data.winAmount, {
+                betAmount: data.betAmount,
+                multiplier: data.multiplier
+            });
             const player = this.playerManager.getPlayer(data.playerId);
-            if (player) {
-                player.isPlaying = false;
-                player.balance += data.winAmount;
-                player.totalWinnings += data.winAmount;
-                player.gamesPlayed++;
-            }
+            const playerBalance = winStats ? winStats.balance : (player ? Number(player.balance.toFixed(2)) : null);
             
             // Notify all players
             this.io.emit('player_cashed_out', {
@@ -307,6 +423,9 @@ class CrashRocketServer {
                 playerName: player?.name || 'Anonymous',
                 multiplier: data.multiplier,
                 amount: data.winAmount,
+                betAmount: data.betAmount,
+                balance: playerBalance,
+                success: true,
                 isAuto: true,
                 isCurrentPlayer: false
             });
@@ -315,10 +434,27 @@ class CrashRocketServer {
             const socket = this.playerManager.getPlayerSocket(data.playerId);
             if (socket) {
                 socket.emit('player_cashed_out', {
-                    ...data,
+                    success: true,
+                    playerId: data.playerId,
+                    multiplier: data.multiplier,
+                    amount: data.winAmount,
+                    betAmount: data.betAmount,
+                    balance: playerBalance,
+                    isAuto: true,
                     isCurrentPlayer: true
                 });
             }
+
+        });
+
+        this.gameEngine.on('round_settled', (settlement) => {
+            if (settlement?.losers?.length) {
+                settlement.losers.forEach(({ playerId }) => {
+                    this.playerManager.resetPlayerGame(playerId);
+                });
+            }
+
+            this.broadcastLeaderboard();
         });
     }
     

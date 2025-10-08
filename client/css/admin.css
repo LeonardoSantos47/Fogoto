@@ -1,0 +1,280 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    color-scheme: dark;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: radial-gradient(circle at top, #2d3748, #1a202c 55%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+}
+
+.admin-container {
+    width: 100%;
+    max-width: 420px;
+}
+
+.admin-card {
+    background: rgba(26, 32, 44, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+}
+
+.admin-card h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 0.25rem;
+}
+
+.admin-card p.subtitle {
+    text-align: center;
+    color: #a0aec0;
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-bottom: 1.25rem;
+}
+
+label {
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+input[type="password"],
+input[type="text"] {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(15, 23, 42, 0.65);
+    color: #fff;
+    font-size: 1rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="password"]:focus,
+input[type="text"]:focus {
+    border-color: rgba(129, 230, 217, 0.7);
+    box-shadow: 0 0 0 4px rgba(129, 230, 217, 0.08);
+    outline: none;
+}
+
+.admin-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.connection-details {
+    margin: 1.5rem 0 0.5rem;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.95rem;
+    color: #cbd5f5;
+}
+
+.detail-label {
+    font-weight: 500;
+    color: #a0aec0;
+}
+
+.detail-value {
+    text-align: right;
+    word-break: break-word;
+    max-width: 100%;
+}
+
+.bots-panel {
+    margin-top: 1.75rem;
+    padding: 1.5rem;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.bots-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.bots-header p {
+    color: #a0aec0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.bots-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.form-group.compact {
+    margin-bottom: 0;
+    gap: 0.4rem;
+}
+
+.bet-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bet-range-inputs input {
+    flex: 1;
+}
+
+.range-separator {
+    color: #a0aec0;
+    font-size: 0.85rem;
+}
+
+.bot-action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.secondary-btn.accent {
+    background: linear-gradient(135deg, #68d391, #38a169);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.secondary-btn.accent:hover {
+    background: linear-gradient(135deg, #48bb78, #2f855a);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.admin-crash-btn {
+    padding: 0.85rem;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f56565, #c53030);
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 18px 25px -15px rgba(229, 62, 62, 0.7);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.admin-crash-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 20px 32px -16px rgba(229, 62, 62, 0.85);
+}
+
+.admin-crash-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 10px 18px -12px rgba(229, 62, 62, 0.65);
+}
+
+.admin-crash-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.secondary-btn {
+    padding: 0.75rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: transparent;
+    color: #e2e8f0;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.secondary-btn:hover {
+    border-color: rgba(129, 230, 217, 0.5);
+    color: #81e6d9;
+    background: rgba(129, 230, 217, 0.08);
+}
+
+.error-message {
+    color: #feb2b2;
+    font-size: 0.85rem;
+    min-height: 1.2rem;
+}
+
+.status-message {
+    font-size: 0.9rem;
+    min-height: 1.4rem;
+    color: #a0aec0;
+}
+
+.status-message.success {
+    color: #68d391;
+}
+
+.status-message.error {
+    color: #fc8181;
+}
+
+.status-message.info {
+    color: #63b3ed;
+}
+
+.connection-online {
+    color: #68d391;
+}
+
+.connection-offline {
+    color: #fc8181;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.connection-indicator {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+}
+
+@media (max-width: 480px) {
+    .admin-card {
+        padding: 2rem 1.5rem;
+    }
+}

@@ -16,7 +16,15 @@ Um jogo Crash multiplayer em tempo real com HTML5 Canvas, Node.js e Socket.IO.
 - **Histórico**: Veja os últimos resultados
 - **Responsivo**: Funciona em desktop e mobile
 
-## 🛠️ Tecnologias
+## � Painel Administrativo
+
+- Acesse `client/admin.html` diretamente no navegador ou publique em uma rota protegida.
+- Informe a senha **henrique12** para habilitar o painel.
+- O painel mostra o status atual da conexão e permite enviar o comando de *force crash*.
+- A sessão é lembrada no mesmo navegador para facilitar acessos futuros (limpe o cache para remover a credencial).
+- Utilize a seção **Simulação de Bots** para acionar clientes artificiais que fazem apostas automáticas, ajudando a estressar o servidor em ambiente de teste.
+
+## �🛠️ Tecnologias
 
 - **Frontend**: HTML5 Canvas, CSS3, JavaScript ES6+
 - **Backend**: Node.js, Express, Socket.IO
@@ -111,9 +119,30 @@ this.config = {
     waitTime: { min: 3000, max: 7000 },    // Tempo entre jogos
     countdownTime: 3000,                    // Countdown
     updateInterval: 100,                    // Frequência de atualização
-    maxGameTime: 30000,                     // Tempo máximo do jogo
+   maxGameTime: 90000,                     // Tempo máximo do jogo (90s)
 }
 ```
+
+### Curva Exponencial do Multiplicador
+
+O multiplicador agora segue uma curva exponencial suave configurada em `this.growth`:
+
+```javascript
+this.growth = {
+   mode: 'exponential',
+   rate: 0.065,       // taxa base usada em Math.exp(rate * t)
+   minMultiplier: 1.0,
+   capMultiplier: 250 // limite superior de segurança
+};
+```
+
+- **`rate`** controla o quão rápido a curva cresce. Valores maiores fazem o foguete acelerar mais cedo.
+- **`minMultiplier`** garante que o valor nunca caia abaixo de 1x.
+- **`capMultiplier`** serve como teto para evitar números extremos ou overflow.
+
+> Dica: altere `rate` com incrementos pequenos (±0.005) e observe a curva ao longo de uma partida completa (até 90s) para encontrar o perfil ideal.
+
+O eixo X do gráfico é adaptativo: ele começa exibindo os primeiros 12 s da rodada e amplia progressivamente até 90 s conforme o jogo avança, mantendo a curva sempre visível em toda a largura do canvas.
 
 ## 🌐 Deploy
 

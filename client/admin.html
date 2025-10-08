@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Administrativo • Crash Rocket</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-card">
+            <h1>Área Administrativa</h1>
+            <p class="subtitle">Acesso restrito. Digite a senha para continuar.</p>
+
+            <form id="auth-form" class="auth-form">
+                <div class="form-group">
+                    <label for="password-input">Senha de acesso</label>
+                    <input type="password" id="password-input" name="password" placeholder="Digite a senha" autocomplete="current-password" required>
+                </div>
+                <div class="error-message" id="auth-error"></div>
+                <button type="submit" class="admin-crash-btn">Entrar</button>
+            </form>
+
+            <div id="admin-section" class="hidden">
+                <div class="status-message" id="status-message"></div>
+
+                <div class="connection-details" aria-live="polite">
+                    <div class="detail-row">
+                        <span class="detail-label">Servidor:</span>
+                        <span class="detail-value" id="server-url">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Status:</span>
+                        <span class="detail-value" id="connection-status">Desconhecido</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Socket ID:</span>
+                        <span class="detail-value" id="socket-id">-</span>
+                    </div>
+                </div>
+
+                <div class="admin-actions">
+                    <button id="force-crash-btn" type="button" class="admin-crash-btn">Forçar crash agora</button>
+                    <button id="logout-btn" type="button" class="secondary-btn">Encerrar sessão</button>
+                </div>
+
+                <div class="bots-panel">
+                    <div class="bots-header">
+                        <h2>Simulação de Bots</h2>
+                        <p>Adicione bots automáticos para estressar o servidor e observar o comportamento em tempo real.</p>
+                    </div>
+
+                    <div class="bots-controls">
+                        <div class="form-group compact">
+                            <label for="bot-count">Bots simultâneos</label>
+                            <input type="number" id="bot-count" min="1" max="200" value="20">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="bot-bet-range">Aposta média (R$)</label>
+                            <div class="bet-range-inputs" id="bot-bet-range">
+                                <input type="number" id="bot-bet-min" min="1" max="1000" value="10" step="1" aria-label="Valor mínimo">
+                                <span class="range-separator">até</span>
+                                <input type="number" id="bot-bet-max" min="1" max="2000" value="50" step="1" aria-label="Valor máximo">
+                            </div>
+                        </div>
+                        <div class="form-group compact">
+                            <label for="bot-auto-range">Auto Retirar (x)</label>
+                            <div class="bet-range-inputs" id="bot-auto-range">
+                                <input type="number" id="bot-auto-min" min="1.1" max="10" value="1.8" step="0.1" aria-label="Multiplicador mínimo">
+                                <span class="range-separator">até</span>
+                                <input type="number" id="bot-auto-max" min="1.2" max="20" value="3.5" step="0.1" aria-label="Multiplicador máximo">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bot-action-buttons">
+                        <button id="start-bots-btn" type="button" class="secondary-btn accent">Iniciar bots</button>
+                        <button id="stop-bots-btn" type="button" class="secondary-btn">Parar bots</button>
+                    </div>
+
+                    <div class="status-message" id="bots-status"></div>
+                </div>
+
+                <div class="status-message" id="last-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="js/socket.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

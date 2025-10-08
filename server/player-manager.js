@@ -67,6 +67,10 @@ class PlayerManager {
         return this.players.get(playerId);
     }
     
+    getAllPlayers() {
+        return Array.from(this.players.values());
+    }
+
     getPlayerSocket(playerId) {
         return this.sockets.get(playerId);
     }
@@ -120,6 +124,33 @@ class PlayerManager {
         return false;
     }
     
+    recordWin(playerId, winAmount = 0, metadata = {}) {
+        const player = this.players.get(playerId);
+        if (!player) {
+            return null;
+        }
+
+        const amount = Number(winAmount) || 0;
+        this.updatePlayerBalance(playerId, amount);
+
+        player.currentBet = 0;
+        player.isPlaying = false;
+        player.autoCashOut = null;
+    player.lastSeenAt = Date.now();
+        player.gamesPlayed++;
+        player.sessionGames++;
+        player.lastWinAmount = amount;
+        player.lastBetAmount = Number(metadata.betAmount || 0);
+        player.lastMultiplier = Number(metadata.multiplier || 0);
+
+        return {
+            balance: Number(player.balance.toFixed(2)),
+            biggestWin: Number(player.biggestWin || 0),
+            longestStreak: Number(player.longestStreak || 0),
+            currentStreak: Number(player.currentStreak || 0)
+        };
+    }
+
     cashOut(playerId, multiplier) {
         const player = this.players.get(playerId);
         if (player && player.isPlaying) {
@@ -159,12 +190,12 @@ class PlayerManager {
     }
     
     getActivePlayers() {
-        return Array.from(this.players.values()).filter(player => player.isPlaying);
+        return this.getAllPlayers().filter(player => player.isPlaying);
     }
     
     getOnlinePlayers() {
         const cutoffTime = Date.now() - 30000; // 30 seconds
-        return Array.from(this.players.values()).filter(player => player.lastSeenAt > cutoffTime);
+        return this.getAllPlayers().filter(player => player.lastSeenAt > cutoffTime);
     }
     
     getPlayerCount() {
@@ -228,12 +259,12 @@ class PlayerManager {
     }
     
     getTotalBalance() {
-        return Array.from(this.players.values())
+        return this.getAllPlayers()
             .reduce((sum, player) => sum + player.balance, 0);
     }
     
     getSessionStats() {
-        const players = Array.from(this.players.values());
+        const players = this.getAllPlayers();
         
         return {
             totalSessionBets: players.reduce((sum, p) => sum + p.sessionBets, 0),
@@ -245,7 +276,7 @@ class PlayerManager {
     
     getAverageSessionLength() {
         const now = Date.now();
-        const players = Array.from(this.players.values());
+        const players = this.getAllPlayers();
         
         if (players.length === 0) return 0;
         
@@ -343,6 +374,83 @@ class PlayerManager {
             };
         }
         return null;
+    }
+
+    // Leaderboard helpers
+    getPlayerPoints(player) {
+        return Number(player.balance || 0);
+    }
+
+    formatLeaderboardEntry(player, rankIndex) {
+        const balance = Number(player.balance || 0);
+        const startingBalance = 1000;
+        const profit = balance - startingBalance;
+
+        return {
+            id: player.id,
+            rank: rankIndex + 1,
+            name: player.name || `Player${player.id.substr(0, 4)}`,
+            balance,
+            profit,
+            totalWinnings: Number(player.totalWinnings || 0),
+            biggestWin: Number(player.biggestWin || 0),
+            longestStreak: Number(player.longestStreak || 0),
+            gamesPlayed: Number(player.gamesPlayed || 0)
+        };
+    }
+
+    getSortedPlayers() {
+        return this.getAllPlayers()
+            .slice()
+            .sort((a, b) => {
+                const diff = this.getPlayerPoints(b) - this.getPlayerPoints(a);
+                if (Math.abs(diff) > 0.001) {
+                    return diff;
+                }
+                const winningsDiff = (b.totalWinnings || 0) - (a.totalWinnings || 0);
+                if (Math.abs(winningsDiff) > 0.001) {
+                    return winningsDiff;
+                }
+                return (a.joinedAt || 0) - (b.joinedAt || 0);
+            });
+    }
+
+    getLeaderboardSnapshot(limit = 10) {
+        const sortedPlayers = this.getSortedPlayers();
+        const entries = sortedPlayers
+            .slice(0, limit)
+            .map((player, index) => this.formatLeaderboardEntry(player, index));
+
+        return {
+            entries,
+            sortedPlayers,
+            totalPlayers: sortedPlayers.length
+        };
+    }
+
+    getPlayerRankInfo(playerId, sortedPlayers = null) {
+        const reference = sortedPlayers || this.getSortedPlayers();
+        const totalPlayers = reference.length;
+        const rankIndex = reference.findIndex(player => player.id === playerId);
+
+        if (rankIndex === -1) {
+            return null;
+        }
+
+        const player = reference[rankIndex];
+        const entry = this.formatLeaderboardEntry(player, rankIndex);
+
+        return {
+            rank: entry.rank,
+            totalPlayers,
+            name: entry.name,
+            balance: entry.balance,
+            profit: entry.profit,
+            totalWinnings: entry.totalWinnings,
+            biggestWin: entry.biggestWin,
+            longestStreak: entry.longestStreak,
+            gamesPlayed: entry.gamesPlayed
+        };
     }
 }
 
