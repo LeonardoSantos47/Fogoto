@@ -1,6 +1,6 @@
 // Socket.IO client connection and event handling
 
-const DEFAULT_TUNNEL_URL = 'https://tuning-midnight-highways-vids.trycloudflare.com';
+const DEFAULT_TUNNEL_URL = 'https://selection-flush-telecommunications-semiconductor.trycloudflare.com';
 
 class SocketManager {
     constructor() {
