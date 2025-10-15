@@ -32,7 +32,8 @@ class GameEngine extends EventEmitter {
         this.config = {
             waitTime: { min: 3000, max: 7000 }, // 3-7 seconds
             countdownTime: 3000, // 3 seconds
-            updateInterval: 100, // 100ms (10 FPS)
+            updateInterval: 100, // 100ms para lógica interna responsiva
+            predictionInterval: 1000, // Snapshot de predição a cada 1s
             maxGameTime: 90000,  // 90 seconds max para suportar curvas longas
             historySize: 20
         };
@@ -53,10 +54,7 @@ class GameEngine extends EventEmitter {
             uptime: Date.now()
         };
 
-        // Broadcast thresholds
-        this.broadcastCfg = {
-            multiplierIncrement: 0.005 // transmissões mais frequentes para curva suave
-        };
+        this._lastPredictionBroadcast = 0;
     }
     
     start() {
@@ -108,7 +106,7 @@ class GameEngine extends EventEmitter {
         this.multiplier = 1.00;
         this.startTime = Date.now();
         this.cashedOutPlayers.clear();
-    this._lastBroadcastMultiplier = this.multiplier;
+        this._lastPredictionBroadcast = 0;
         
         this.emit('game_state_changed', this.buildMultiplierPayload(0));
         
@@ -124,15 +122,15 @@ class GameEngine extends EventEmitter {
     updateGame() {
         if (this.state !== GAME_STATES.FLYING) return;
         
-        const elapsed = (Date.now() - this.startTime) / 1000;
+        const now = Date.now();
+        const elapsed = (now - this.startTime) / 1000;
         const newMultiplier = this.calculateMultiplier(elapsed);
-        
-        // Apenas transmitir se houve mudança significativa
-        if (newMultiplier - this._lastBroadcastMultiplier >= this.broadcastCfg.multiplierIncrement) {
-            this.multiplier = newMultiplier;
-            this._lastBroadcastMultiplier = newMultiplier;
-            const payload = this.buildMultiplierPayload(elapsed);
-            this.emit('multiplier_update', payload);
+        this.multiplier = newMultiplier;
+
+        if (!this._lastPredictionBroadcast || (now - this._lastPredictionBroadcast) >= this.config.predictionInterval) {
+            this._lastPredictionBroadcast = now;
+            const predictionPayload = this.buildMultiplierPayload(elapsed, now);
+            this.emit('multiplier_update', predictionPayload);
         }
         
         // Check for crash
@@ -151,7 +149,7 @@ class GameEngine extends EventEmitter {
         this.checkAutoCashOuts();
         
         // Emit game state
-        this.emit('game_state_changed', this.buildMultiplierPayload(elapsed));
+    this.emit('game_state_changed', this.buildMultiplierPayload(elapsed, now));
     }
     
     calculateMultiplier(timeInSeconds) {
@@ -217,6 +215,13 @@ class GameEngine extends EventEmitter {
         
         this.clearTimers();
         this.state = GAME_STATES.CRASHED;
+
+        if (this.startTime) {
+            const now = Date.now();
+            const elapsed = (now - this.startTime) / 1000;
+            const finalSnapshot = this.buildMultiplierPayload(elapsed, now);
+            this.emit('multiplier_update', finalSnapshot);
+        }
         
         // Update statistics
         this.stats.totalGames++;
@@ -304,15 +309,18 @@ class GameEngine extends EventEmitter {
         }
     }
 
-    buildMultiplierPayload(explicitElapsed = null) {
+    buildMultiplierPayload(explicitElapsed = null, explicitTimestamp = null) {
+        const timestamp = explicitTimestamp !== null ? explicitTimestamp : Date.now();
         const elapsed = explicitElapsed !== null
             ? explicitElapsed
-            : (this.startTime ? (Date.now() - this.startTime) / 1000 : 0);
+            : (this.startTime ? (timestamp - this.startTime) / 1000 : 0);
         return {
             state: this.state,
             multiplier: Number(this.multiplier.toFixed(4)),
             displayMultiplier: Number(this.multiplier.toFixed(2)),
-            time: elapsed
+            time: elapsed,
+            timestamp,
+            growthRate: this.growth.rate
         };
     }
     

@@ -146,6 +146,7 @@ class RocketCurve {
         this.timeWindow = this.minTimeWindow;
         this.timeWindowTarget = this.minTimeWindow;
         this.interpolationStep = 0.1; // cria pontos intermediários para curva suave
+        this.predictedPoint = null;
     }
     
     reset() {
@@ -155,6 +156,7 @@ class RocketCurve {
         this.timeWindow = this.minTimeWindow;
         this.timeWindowTarget = this.minTimeWindow;
         this.stopAnimation();
+        this.predictedPoint = null;
     }
     
     addPoint(time, multiplier) {
@@ -212,6 +214,25 @@ class RocketCurve {
         }
     }
 
+    setPredictedPoint(time, multiplier) {
+        if (typeof time !== 'number' || typeof multiplier !== 'number' || !Number.isFinite(time) || !Number.isFinite(multiplier)) {
+            this.predictedPoint = null;
+            return;
+        }
+
+        const safeMultiplier = Math.max(1.0, Math.min(multiplier, 250));
+        const safeTime = Math.max(0, time);
+
+        this.predictedPoint = {
+            time: safeTime,
+            multiplier: safeMultiplier
+        };
+    }
+
+    clearPredictedPoint() {
+        this.predictedPoint = null;
+    }
+
     getWindowSize() {
         return Math.max(this.minTimeWindow, Math.min(this.maxTimeWindow, this.timeWindow));
     }
@@ -246,7 +267,7 @@ class RocketCurve {
         }
 
         // Converte pontos crus para pontos em tela usando escala dinâmica
-        const nowWindowEnd = this.rawPoints[this.rawPoints.length - 1].time; // último tempo conhecido
+    const nowWindowEnd = this.rawPoints[this.rawPoints.length - 1].time; // último tempo conhecido
         const windowStart = Math.max(0, nowWindowEnd - windowSize);
         // Dimensões em pixels CSS (o contexto já está escalado pelo DPR)
         const cssWidth = this.canvas.width;
@@ -262,6 +283,18 @@ class RocketCurve {
             const yNorm = (mClamped - 1.0) / (yMax - 1.0);
             const y = cssHeight - yNorm * cssHeight;
             pts.push({ x, y });
+        }
+
+        if (this.predictedPoint) {
+            const lastRaw = this.rawPoints[this.rawPoints.length - 1];
+            if (lastRaw && this.predictedPoint.time >= lastRaw.time) {
+                const tNorm = (this.predictedPoint.time - windowStart) / windowSize;
+                const x = Math.min(cssWidth * tNorm, cssWidth);
+                const mClamped = Math.max(1.0, Math.min(this.predictedPoint.multiplier, yMax));
+                const yNorm = (mClamped - 1.0) / (yMax - 1.0);
+                const y = cssHeight - yNorm * cssHeight;
+                pts.push({ x, y, predicted: true });
+            }
         }
 
         if (pts.length < 2) {
@@ -326,16 +359,19 @@ class RocketCurve {
     drawCurrentPoint() {
         if (this.rawPoints.length === 0) return;
 
-        // Converte último ponto para coordenadas atuais
-        const lastRaw = this.rawPoints[this.rawPoints.length - 1];
+        const referencePoint = (this.predictedPoint && this.rawPoints.length)
+            ? this.predictedPoint
+            : this.rawPoints[this.rawPoints.length - 1];
+
+        // Converte ponto de referência para coordenadas atuais
         const windowSize = this.getWindowSize();
-        const windowStart = Math.max(0, lastRaw.time - windowSize);
+        const windowStart = Math.max(0, referencePoint.time - windowSize);
         const cssWidth = this.canvas.width;
         const cssHeight = this.canvas.height;
         const yMax = Math.max(1.01, this.yMax);
-        const tNorm = (lastRaw.time - windowStart) / windowSize;
+        const tNorm = (referencePoint.time - windowStart) / windowSize;
         const x = Math.min(cssWidth * tNorm, cssWidth);
-        const mClamped = Math.max(1.0, Math.min(lastRaw.multiplier, yMax));
+        const mClamped = Math.max(1.0, Math.min(referencePoint.multiplier, yMax));
         const yNorm = (mClamped - 1.0) / (yMax - 1.0);
         const y = cssHeight - yNorm * cssHeight;
         const { ctx } = this;
@@ -378,16 +414,21 @@ class RocketCurve {
     // Get curve trajectory for rocket sprite positioning
     getRocketPosition() {
         if (this.rawPoints.length === 0) return null;
-        
+
         const lastRaw = this.rawPoints[this.rawPoints.length - 1];
+
+        const referencePoint = (this.predictedPoint && this.rawPoints.length)
+            ? this.predictedPoint
+            : this.rawPoints[this.rawPoints.length - 1];
+
         const windowSize = this.getWindowSize();
-        const windowStart = Math.max(0, lastRaw.time - windowSize);
+        const windowStart = Math.max(0, referencePoint.time - windowSize);
         const cssWidth = this.canvas.width;
         const cssHeight = this.canvas.height;
         const yMax = Math.max(1.01, this.yMax);
-        const tNorm = (lastRaw.time - windowStart) / windowSize;
+        const tNorm = (referencePoint.time - windowStart) / windowSize;
         const x = Math.min(cssWidth * tNorm, cssWidth);
-        const mClamped = Math.max(1.0, Math.min(lastRaw.multiplier, yMax));
+        const mClamped = Math.max(1.0, Math.min(referencePoint.multiplier, yMax));
         const yNorm = (mClamped - 1.0) / (yMax - 1.0);
         const y = cssHeight - yNorm * cssHeight;
         
@@ -395,7 +436,7 @@ class RocketCurve {
         let angle = 0;
         if (this.rawPoints.length > 1) {
             const prevRaw = this.rawPoints[this.rawPoints.length - 2];
-            const prevTNorm = (prevRaw.time - windowStart) / this.timeWindow;
+            const prevTNorm = (prevRaw.time - windowStart) / windowSize;
             const px = Math.min(cssWidth * prevTNorm, cssWidth);
             const pm = Math.max(1.0, Math.min(prevRaw.multiplier, yMax));
             const pyNorm = (pm - 1.0) / (yMax - 1.0);
@@ -407,7 +448,7 @@ class RocketCurve {
             x,
             y,
             angle: angle,
-            multiplier: lastRaw.multiplier
+            multiplier: lastRaw ? lastRaw.multiplier : referencePoint.multiplier
         };
     }
 }

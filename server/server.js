@@ -461,7 +461,7 @@ class CrashRocketServer {
     isValidBet(amount) {
         return typeof amount === 'number' && 
                amount >= 1 && 
-               amount <= 10000 && 
+               amount <= 1000000000 && 
                Number.isFinite(amount);
     }
     
